@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASL Tutor - Learn Sign Language with AI</title>
+    <link rel="stylesheet" href="styles/main.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <h1>ASL Tutor</h1>
+        <nav class="main-nav">
+          <button class="nav-btn" data-view="learn">Learn</button>
+          <button class="nav-btn" data-view="practice">Practice</button>
+          <button class="nav-btn" data-view="test">Test</button>
+          <button class="nav-btn" data-view="progress">Progress</button>
+        </nav>
+      </header>
+
+      <main class="app-main">
+        <!-- Learn Mode -->
+        <section id="learn-view" class="view-section">
+          <div class="lesson-container">
+            <div class="sign-display">
+              <h2 id="current-sign">Welcome to ASL Tutor</h2>
+              <div class="sign-visual">
+                <img id="sign-image" src="" alt="ASL Sign" />
+                <video id="sign-video" muted></video>
+              </div>
+              <p id="sign-description"></p>
+            </div>
+            <div class="lesson-controls">
+              <button id="prev-sign">Previous</button>
+              <button id="next-sign">Next</button>
+              <button id="practice-sign">Practice This Sign</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Practice Mode -->
+        <section id="practice-view" class="view-section">
+          <div class="practice-container">
+            <div class="video-section">
+              <video id="webcam" autoplay muted playsinline></video>
+              <canvas id="output-canvas"></canvas>
+              <div class="hand-landmarks-overlay"></div>
+            </div>
+            <div class="feedback-section">
+              <div class="current-target">
+                <h3>Practice: <span id="target-sign">A</span></h3>
+                <img id="target-sign-image" src="" alt="Target sign" />
+              </div>
+              <div class="real-time-feedback">
+                <div class="confidence-meter">
+                  <div class="confidence-bar">
+                    <div id="confidence-fill"></div>
+                  </div>
+                  <span id="confidence-text">0%</span>
+                </div>
+                <div class="prediction-result">
+                  <span id="predicted-sign">--</span>
+                  <div id="feedback-message"></div>
+                </div>
+              </div>
+              <div class="correction-hints" id="correction-hints"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Test Mode -->
+        <section id="test-view" class="view-section">
+          <div class="test-container">
+            <div class="test-header">
+              <h2>ASL Quiz</h2>
+              <div class="test-progress">
+                <span id="question-counter">1 / 10</span>
+                <div class="progress-bar">
+                  <div id="progress-fill"></div>
+                </div>
+              </div>
+            </div>
+            <div class="test-content">
+              <div class="question-display">
+                <h3 id="test-question">Sign the letter: A</h3>
+              </div>
+              <div class="test-video-section">
+                <video id="test-webcam" autoplay muted playsinline></video>
+                <canvas id="test-canvas"></canvas>
+              </div>
+              <div class="test-result" id="test-result"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Progress View -->
+        <section id="progress-view" class="view-section">
+          <div class="progress-container">
+            <h2>Your Progress</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <h3>Signs Learned</h3>
+                <span id="signs-learned">0</span>
+              </div>
+              <div class="stat-card">
+                <h3>Accuracy</h3>
+                <span id="overall-accuracy">0%</span>
+              </div>
+              <div class="stat-card">
+                <h3>Practice Time</h3>
+                <span id="practice-time">0 min</span>
+              </div>
+            </div>
+            <div class="progress-chart">
+              <canvas id="progress-chart"></canvas>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Loading Screen -->
+      <div id="loading-screen" class="loading-overlay">
+        <div class="loading-content">
+          <div class="spinner"></div>
+          <p id="loading-text">Loading AI models...</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

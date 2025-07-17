@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASL Data Collector</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .video-section {
+        position: relative;
+        margin: 20px 0;
+      }
+      video,
+      canvas {
+        width: 100%;
+        max-width: 640px;
+      }
+      .controls {
+        margin: 20px 0;
+      }
+      button {
+        margin: 5px;
+        padding: 10px 20px;
+      }
+      .recording {
+        background-color: #ff4444;
+        color: white;
+      }
+      .data-display {
+        background: #f5f5f5;
+        padding: 10px;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>ASL Training Data Collector</h1>
+
+      <div class="controls">
+        <label for="sign-select">Current Sign:</label>
+        <select id="sign-select">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="HELLO">HELLO</option>
+          <option value="THANK_YOU">THANK_YOU</option>
+        </select>
+
+        <button id="start-recording">Start Recording</button>
+        <button id="stop-recording" disabled>Stop Recording</button>
+        <button id="save-data">Save Dataset</button>
+        <button id="clear-data">Clear Data</button>
+      </div>
+
+      <div class="video-section">
+        <video id="webcam" autoplay muted playsinline></video>
+        <canvas id="output"></canvas>
+      </div>
+
+      <div class="data-display">
+        <h3>Collected Samples</h3>
+        <div id="sample-count">0 samples collected</div>
+        <div id="current-sign-count">0 samples for current sign</div>
+      </div>
+
+      <div class="data-display">
+        <h3>Latest Sample</h3>
+        <pre id="latest-sample"></pre>
+      </div>
+    </div>
+
+    <script>
+      class DataCollector {
+        constructor() {
+          this.hands = null;
+          this.camera = null;
+          this.isRecording = false;
+          this.collectedData = [];
+          this.currentSign = "A";
+          this.frameBuffer = [];
+          this.recordingInterval = null;
+        }
+
+        async init() {
+          // Initialize MediaPipe
+          this.hands = new Hands({
+            locateFile: (file) =>
+              `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+          });
+
+          this.hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.5,
+          });
+
+          this.hands.onResults((results) => this.onResults(results));
+
+          // Setup camera
+          const video = document.getElementById("webcam");
+          this.camera = new Camera(video, {
+            onFrame: async () => {
+              await this.hands.send({ image: video });
+            },
+            width: 640,
+            height: 480,
+          });
+
+          await this.camera.start();
+          this.setupEventListeners();
+        }
+
+        setupEventListeners() {
+          document
+            .getElementById("sign-select")
+            .addEventListener("change", (e) => {
+              this.currentSign = e.target.value;
+              this.updateDisplay();
+            });
+
+          document
+            .getElementById("start-recording")
+            .addEventListener("click", () => {
+              this.startRecording();
+            });
+
+          document
+            .getElementById("stop-recording")
+            .addEventListener("click", () => {
+              this.stopRecording();
+            });
+
+          document.getElementById("save-data").addEventListener("click", () => {
+            this.saveDataset();
+          });
+
+          document
+            .getElementById("clear-data")
+            .addEventListener("click", () => {
+              this.clearData();
+            });
+        }
+
+        onResults(results) {
+          const canvas = document.getElementById("output");
+          const ctx = canvas.getContext("2d");
+
+          canvas.width = results.image.width;
+          canvas.height = results.image.height;
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(results.image, 0, 0);
+
+          if (
+            results.multiHandLandmarks &&
+            results.multiHandLandmarks.length > 0
+          ) {
+            const landmarks = results.multiHandLandmarks[0];
+
+            // Draw landmarks
+            drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {
+              color: "#00FF00",
+              lineWidth: 2,
+            });
+            drawLandmarks(ctx, landmarks, { color: "#FF0000", lineWidth: 1 });
+
+            if (this.isRecording) {
+              this.recordSample(landmarks);
+            }
+          }
+        }
+
+        recordSample(landmarks) {
+          const features = this.extractFeatures(landmarks);
+          const sample = {
+            sign: this.currentSign,
+            features: features,
+            timestamp: Date.now(),
+          };
+
+          this.collectedData.push(sample);
+          document.getElementById("latest-sample").textContent = JSON.stringify(
+            sample,
+            null,
+            2
+          );
+          this.updateDisplay();
+        }
+
+        extractFeatures(landmarks) {
+          // Extract normalized features
+          const features = [];
+
+          // Find bounding box
+          let minX = 1,
+            minY = 1,
+            maxX = 0,
+            maxY = 0;
+          landmarks.forEach((point) => {
+            minX = Math.min(minX, point.x);
+            minY = Math.min(minY, point.y);
+            maxX = Math.max(maxX, point.x);
+            maxY = Math.max(maxY, point.y);
+          });
+
+          const width = maxX - minX;
+          const height = maxY - minY;
+          const size = Math.max(width, height);
+
+          // Normalize landmarks
+          landmarks.forEach((point) => {
+            features.push(
+              (point.x - minX - width / 2) / size,
+              (point.y - minY - height / 2) / size,
+              point.z || 0
+            );
+          });
+
+          return features;
+        }
+
+        startRecording() {
+          this.isRecording = true;
+          document.getElementById("start-recording").disabled = true;
+          document.getElementById("stop-recording").disabled = false;
+          document.getElementById("start-recording").textContent =
+            "Recording...";
+          document.getElementById("start-recording").classList.add("recording");
+        }
+
+        stopRecording() {
+          this.isRecording = false;
+          document.getElementById("start-recording").disabled = false;
+          document.getElementById("stop-recording").disabled = true;
+          document.getElementById("start-recording").textContent =
+            "Start Recording";
+          document
+            .getElementById("start-recording")
+            .classList.remove("recording");
+        }
+
+        updateDisplay() {
+          const totalSamples = this.collectedData.length;
+          const currentSignSamples = this.collectedData.filter(
+            (s) => s.sign === this.currentSign
+          ).length;
+
+          document.getElementById(
+            "sample-count"
+          ).textContent = `${totalSamples} samples collected`;
+          document.getElementById(
+            "current-sign-count"
+          ).textContent = `${currentSignSamples} samples for ${this.currentSign}`;
+        }
+
+        saveDataset() {
+          const dataset = {
+            metadata: {
+              version: "1.0",
+              created: new Date().toISOString(),
+              totalSamples: this.collectedData.length,
+            },
+            data: this.collectedData,
+          };
+
+          const blob = new Blob([JSON.stringify(dataset, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `asl_dataset_${Date.now()}.json`;
+          a.click();
+        }
+
+        clearData() {
+          if (confirm("Clear all collected data?")) {
+            this.collectedData = [];
+            this.updateDisplay();
+            document.getElementById("latest-sample").textContent = "";
+          }
+        }
+      }
+
+      // Initialize when page loads
+      window.addEventListener("load", async () => {
+        const collector = new DataCollector();
+        await collector.init();
+      });
+    </script>
+  </body>
+</html>
